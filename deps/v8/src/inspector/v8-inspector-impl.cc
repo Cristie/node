@@ -58,21 +58,23 @@ V8InspectorImpl::V8InspectorImpl(v8::Isolate* isolate,
       m_debugger(new V8Debugger(isolate, this)),
       m_capturingStackTracesCount(0),
       m_lastExceptionId(0),
-      m_lastContextId(0) {
+      m_lastContextId(0),
+      m_isolateId(v8::debug::GetNextRandomInt64(m_isolate)) {
+  v8::debug::SetInspector(m_isolate, this);
   v8::debug::SetConsoleDelegate(m_isolate, console());
 }
 
 V8InspectorImpl::~V8InspectorImpl() {
+  v8::debug::SetInspector(m_isolate, nullptr);
   v8::debug::SetConsoleDelegate(m_isolate, nullptr);
 }
 
-int V8InspectorImpl::contextGroupId(v8::Local<v8::Context> context) {
+int V8InspectorImpl::contextGroupId(v8::Local<v8::Context> context) const {
   return contextGroupId(InspectedContext::contextId(context));
 }
 
-int V8InspectorImpl::contextGroupId(int contextId) {
-  protocol::HashMap<int, int>::iterator it =
-      m_contextIdToGroupIdMap.find(contextId);
+int V8InspectorImpl::contextGroupId(int contextId) const {
+  auto it = m_contextIdToGroupIdMap.find(contextId);
   return it != m_contextIdToGroupIdMap.end() ? it->second : 0;
 }
 
@@ -178,6 +180,10 @@ InspectedContext* V8InspectorImpl::getContext(int groupId,
   return contextIt->second.get();
 }
 
+InspectedContext* V8InspectorImpl::getContext(int contextId) const {
+  return getContext(contextGroupId(contextId), contextId);
+}
+
 void V8InspectorImpl::contextCreated(const V8ContextInfo& info) {
   int contextId = ++m_lastContextId;
   InspectedContext* context = new InspectedContext(this, info, contextId);
@@ -231,21 +237,9 @@ void V8InspectorImpl::resetContextGroup(int contextGroupId) {
   m_debugger->wasmTranslation()->Clear();
 }
 
-void V8InspectorImpl::idleStarted() {
-  for (auto& it : m_sessions) {
-    for (auto& it2 : it.second) {
-      if (it2.second->profilerAgent()->idleStarted()) return;
-    }
-  }
-}
+void V8InspectorImpl::idleStarted() { m_isolate->SetIdle(true); }
 
-void V8InspectorImpl::idleFinished() {
-  for (auto& it : m_sessions) {
-    for (auto& it2 : it.second) {
-      if (it2.second->profilerAgent()->idleFinished()) return;
-    }
-  }
-}
+void V8InspectorImpl::idleFinished() { m_isolate->SetIdle(false); }
 
 unsigned V8InspectorImpl::exceptionThrown(
     v8::Local<v8::Context> context, const StringView& message,
@@ -284,20 +278,37 @@ std::unique_ptr<V8StackTrace> V8InspectorImpl::captureStackTrace(
   return m_debugger->captureStackTrace(fullStack);
 }
 
+V8StackTraceId V8InspectorImpl::storeCurrentStackTrace(
+    const StringView& description) {
+  return m_debugger->storeCurrentStackTrace(description);
+}
+
+void V8InspectorImpl::externalAsyncTaskStarted(const V8StackTraceId& parent) {
+  m_debugger->externalAsyncTaskStarted(parent);
+}
+
+void V8InspectorImpl::externalAsyncTaskFinished(const V8StackTraceId& parent) {
+  m_debugger->externalAsyncTaskFinished(parent);
+}
+
 void V8InspectorImpl::asyncTaskScheduled(const StringView& taskName, void* task,
                                          bool recurring) {
+  if (!task) return;
   m_debugger->asyncTaskScheduled(taskName, task, recurring);
 }
 
 void V8InspectorImpl::asyncTaskCanceled(void* task) {
+  if (!task) return;
   m_debugger->asyncTaskCanceled(task);
 }
 
 void V8InspectorImpl::asyncTaskStarted(void* task) {
+  if (!task) return;
   m_debugger->asyncTaskStarted(task);
 }
 
 void V8InspectorImpl::asyncTaskFinished(void* task) {
+  if (!task) return;
   m_debugger->asyncTaskFinished(task);
 }
 

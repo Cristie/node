@@ -499,7 +499,6 @@ _ALT_TOKEN_REPLACEMENT = {
 _ALT_TOKEN_REPLACEMENT_PATTERN = re.compile(
     r'[ =()](' + ('|'.join(_ALT_TOKEN_REPLACEMENT.keys())) + r')(?=[ (]|$)')
 
-
 # These constants define types of headers for use with
 # _IncludeState.CheckNextIncludeOrder().
 _C_SYS_HEADER = 1
@@ -525,6 +524,12 @@ _SEARCH_C_FILE = re.compile(r'\b(?:LINT_C_FILE|'
 
 # Match string that indicates we're working on a Linux Kernel file.
 _SEARCH_KERNEL_FILE = re.compile(r'\b(?:LINT_KERNEL_FILE)')
+
+_NULL_TOKEN_PATTERN = re.compile(r'\bNULL\b')
+
+_RIGHT_LEANING_POINTER_PATTERN = re.compile(r'[^=|(,\s><);&?:}]'
+                                            r'(?<!(sizeof|return))'
+                                            r'\s\*[a-zA-z_][0-9a-zA-z_]*')
 
 _regexp_compile_cache = {}
 
@@ -1074,8 +1079,8 @@ class FileInfo(object):
     """
     fullname = self.FullName()
     # XXX(bnoordhuis) Expects that cpplint.py lives in the tools/ directory.
-    toplevel = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..')).replace('\\', '/')
+    toplevel = os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) \
+    .replace('\\', '/').decode('utf-8')
     prefix = os.path.commonprefix([fullname, toplevel])
     return fullname[len(prefix) + 1:]
 
@@ -3021,7 +3026,7 @@ def CheckComment(line, filename, linenum, next_line_start, error):
       # If the comment contains an alphanumeric character, there
       # should be a space somewhere between it and the // unless
       # it's a /// or //! Doxygen comment.
-      if (Match(r'//[^ ]*\w', comment) and
+      if (Match(r'(?://[^ ]*\w)|(?:////\s*$)', comment) and
           not Match(r'(///|//\!)(\s+|$)', comment)):
         error(filename, linenum, 'whitespace/comments', 4,
               'Should have a space between // and comment')
@@ -4156,6 +4161,49 @@ def CheckAltTokens(filename, clean_lines, linenum, error):
           'Use operator %s instead of %s' % (
               _ALT_TOKEN_REPLACEMENT[match.group(1)], match.group(1)))
 
+def CheckNullTokens(filename, clean_lines, linenum, error):
+  """Check NULL usage.
+
+  Args:
+    filename: The name of the current file.
+    clean_lines: A CleansedLines instance containing the file.
+    linenum: The number of the line to check.
+    error: The function to call with any errors found.
+  """
+  line = clean_lines.elided[linenum]
+
+  # Avoid preprocessor lines
+  if Match(r'^\s*#', line):
+    return
+
+  if line.find('/*') >= 0 or line.find('*/') >= 0:
+    return
+
+  for match in _NULL_TOKEN_PATTERN.finditer(line):
+    error(filename, linenum, 'readability/null_usage', 2,
+          'Use nullptr instead of NULL')
+
+def CheckLeftLeaningPointer(filename, clean_lines, linenum, error):
+  """Check for left-leaning pointer placement.
+
+  Args:
+    filename: The name of the current file.
+    clean_lines: A CleansedLines instance containing the file.
+    linenum: The number of the line to check.
+    error: The function to call with any errors found.
+  """
+  line = clean_lines.elided[linenum]
+
+  # Avoid preprocessor lines
+  if Match(r'^\s*#', line):
+    return
+
+  if '/*' in line or '*/' in line:
+    return
+
+  for match in _RIGHT_LEANING_POINTER_PATTERN.finditer(line):
+    error(filename, linenum, 'readability/null_usage', 2,
+          'Use left leaning pointer instead of right leaning')
 
 def GetLineWidth(line):
   """Determines the width of the line in column positions.
@@ -4207,6 +4255,10 @@ def CheckStyle(filename, clean_lines, linenum, file_extension, nesting_state,
   if line.find('\t') != -1:
     error(filename, linenum, 'whitespace/tab', 1,
           'Tab found; better to use spaces')
+
+  if line.find('template<') != -1:
+    error(filename, linenum, 'whitespace/template', 1,
+          'Leave a single space after template, as in `template <...>`')
 
   # One or three blank spaces at the beginning of the line is weird; it's
   # hard to reconcile that with 2-space indents.
@@ -4294,6 +4346,8 @@ def CheckStyle(filename, clean_lines, linenum, file_extension, nesting_state,
   CheckSpacingForFunctionCall(filename, clean_lines, linenum, error)
   CheckCheck(filename, clean_lines, linenum, error)
   CheckAltTokens(filename, clean_lines, linenum, error)
+  CheckNullTokens(filename, clean_lines, linenum, error)
+  CheckLeftLeaningPointer(filename, clean_lines, linenum, error)
   classinfo = nesting_state.InnermostClass()
   if classinfo:
     CheckSectionSpacing(filename, clean_lines, classinfo, linenum, error)
@@ -6084,7 +6138,7 @@ def main():
 
   _cpplint_state.ResetErrorCounts()
   for filename in filenames:
-    ProcessFile(filename, _cpplint_state.verbose_level)
+    ProcessFile(filename.decode('utf-8'), _cpplint_state.verbose_level)
   _cpplint_state.PrintErrorCounts()
 
   sys.exit(_cpplint_state.error_count > 0)

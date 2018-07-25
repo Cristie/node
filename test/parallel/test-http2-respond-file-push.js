@@ -3,9 +3,11 @@
 const common = require('../common');
 if (!common.hasCrypto)
   common.skip('missing crypto');
+
+const fixtures = require('../common/fixtures');
+
 const http2 = require('http2');
 const assert = require('assert');
-const path = require('path');
 const fs = require('fs');
 
 const {
@@ -14,7 +16,7 @@ const {
   HTTP2_HEADER_LAST_MODIFIED
 } = http2.constants;
 
-const fname = path.resolve(common.fixturesDir, 'elipses.txt');
+const fname = fixtures.path('elipses.txt');
 const data = fs.readFileSync(fname);
 const stat = fs.statSync(fname);
 const fd = fs.openSync(fname, 'r');
@@ -27,7 +29,8 @@ server.on('stream', (stream) => {
   stream.pushStream({
     ':path': '/file.txt',
     ':method': 'GET'
-  }, (stream) => {
+  }, (err, stream) => {
+    assert.ifError(err);
     stream.respondWithFD(fd, {
       [HTTP2_HEADER_CONTENT_TYPE]: 'text/plain',
       [HTTP2_HEADER_CONTENT_LENGTH]: stat.size,
@@ -48,7 +51,7 @@ server.listen(0, () => {
   function maybeClose() {
     if (--expected === 0) {
       server.close();
-      client.destroy();
+      client.close();
     }
   }
 

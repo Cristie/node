@@ -1,12 +1,13 @@
 'use strict';
+
 const common = require('../common');
 
 const assert = require('assert');
 const fs = require('fs');
-const path = require('path');
+const fixtures = require('../common/fixtures');
 
-const fn = path.join(common.fixturesDir, 'elipses.txt');
-const rangeFile = path.join(common.fixturesDir, 'x.txt');
+const fn = fixtures.path('elipses.txt');
+const rangeFile = fixtures.path('x.txt');
 
 {
   let paused = false;
@@ -109,14 +110,15 @@ const rangeFile = path.join(common.fixturesDir, 'x.txt');
 
 {
   const message =
-    'The value of "start" must be <= "end". Received "{start: 10, end: 2}"';
+    'The value of "start" is out of range. It must be <= "end" (here: 2).' +
+    ' Received 10';
 
   common.expectsError(
     () => {
       fs.createReadStream(rangeFile, Object.create({ start: 10, end: 2 }));
     },
     {
-      code: 'ERR_VALUE_OUT_OF_RANGE',
+      code: 'ERR_OUT_OF_RANGE',
       message,
       type: RangeError
     });

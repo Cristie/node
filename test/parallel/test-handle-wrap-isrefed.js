@@ -66,8 +66,8 @@ const dgram = require('dgram');
 
 // pipe
 {
-  const Pipe = process.binding('pipe_wrap').Pipe;
-  const handle = new Pipe();
+  const { Pipe, constants: PipeConstants } = process.binding('pipe_wrap');
+  const handle = new Pipe(PipeConstants.SOCKET);
   strictEqual(Object.getPrototypeOf(handle).hasOwnProperty('hasRef'),
               true, 'pipe_wrap: hasRef() missing');
   strictEqual(handle.hasRef(),
@@ -107,23 +107,6 @@ const dgram = require('dgram');
   server._handle.close(common.mustCall(() =>
     strictEqual(server._handle.hasRef(),
                 false, 'tcp_wrap: not unrefed on close')));
-}
-
-
-// timers
-{
-  const timer = setTimeout(() => {}, 500);
-  timer.unref();
-  strictEqual(Object.getPrototypeOf(timer._handle).hasOwnProperty('hasRef'),
-              true, 'timer_wrap: hasRef() missing');
-  strictEqual(timer._handle.hasRef(),
-              false, 'timer_wrap: unref() ineffective');
-  timer.ref();
-  strictEqual(timer._handle.hasRef(),
-              true, 'timer_wrap: ref() ineffective');
-  timer._handle.close(common.mustCall(() =>
-    strictEqual(timer._handle.hasRef(),
-                false, 'timer_wrap: not unrefed on close')));
 }
 
 

@@ -36,17 +36,9 @@
 #include "test/cctest/cctest.h"
 #include "test/cctest/profiler-extension.h"
 
-using i::CodeEntry;
-using i::CodeMap;
-using i::CpuProfile;
-using i::CpuProfiler;
-using i::CpuProfilesCollection;
-using i::ProfileNode;
-using i::ProfileTree;
-using i::ProfileGenerator;
-using i::TickSample;
-using i::Vector;
-
+namespace v8 {
+namespace internal {
+namespace test_profile_generator {
 
 TEST(ProfileNodeFindOrAddChild) {
   CcTest::InitializeVM();
@@ -98,17 +90,16 @@ class ProfileTreeTestHelper {
   explicit ProfileTreeTestHelper(const ProfileTree* tree)
       : tree_(tree) { }
 
-  ProfileNode* Walk(CodeEntry* entry1,
-                    CodeEntry* entry2 = NULL,
-                    CodeEntry* entry3 = NULL) {
+  ProfileNode* Walk(CodeEntry* entry1, CodeEntry* entry2 = nullptr,
+                    CodeEntry* entry3 = nullptr) {
     ProfileNode* node = tree_->root();
     node = node->FindChild(entry1);
-    if (node == NULL) return NULL;
-    if (entry2 != NULL) {
+    if (node == nullptr) return nullptr;
+    if (entry2 != nullptr) {
       node = node->FindChild(entry2);
-      if (node == NULL) return NULL;
+      if (node == nullptr) return nullptr;
     }
-    if (entry3 != NULL) {
+    if (entry3 != nullptr) {
       node = node->FindChild(entry3);
     }
     return node;
@@ -132,7 +123,8 @@ TEST(ProfileTreeAddPathFromEnd) {
   CHECK(!helper.Walk(&entry2));
   CHECK(!helper.Walk(&entry3));
 
-  CodeEntry* path[] = {NULL, &entry3, NULL, &entry2, NULL, NULL, &entry1, NULL};
+  CodeEntry* path[] = {nullptr, &entry3, nullptr, &entry2,
+                       nullptr, nullptr, &entry1, nullptr};
   std::vector<CodeEntry*> path_vec(path, path + arraysize(path));
   tree.AddPathFromEnd(path_vec);
   CHECK(!helper.Walk(&entry2));
@@ -407,11 +399,10 @@ TEST(RecordTickSample) {
   delete entry3;
 }
 
-
-static void CheckNodeIds(ProfileNode* node, unsigned* expectedId) {
+static void CheckNodeIds(const ProfileNode* node, unsigned* expectedId) {
   CHECK_EQ((*expectedId)++, node->id());
-  for (int i = 0; i < node->children()->length(); i++) {
-    CheckNodeIds(node->children()->at(i), expectedId);
+  for (const ProfileNode* child : *node->children()) {
+    CheckNodeIds(child, expectedId);
   }
 }
 
@@ -506,11 +497,10 @@ TEST(NoSamples) {
 
 static const ProfileNode* PickChild(const ProfileNode* parent,
                                     const char* name) {
-  for (int i = 0; i < parent->children()->length(); ++i) {
-    const ProfileNode* child = parent->children()->at(i);
+  for (const ProfileNode* child : *parent->children()) {
     if (strcmp(child->entry()->name(), name) == 0) return child;
   }
-  return NULL;
+  return nullptr;
 }
 
 
@@ -554,11 +544,10 @@ TEST(RecordStackTraceAtStartProfiling) {
   CHECK(const_cast<ProfileNode*>(current));
   current = PickChild(current, "c");
   CHECK(const_cast<ProfileNode*>(current));
-  CHECK(current->children()->length() == 0 ||
-        current->children()->length() == 1);
-  if (current->children()->length() == 1) {
+  CHECK(current->children()->empty() || current->children()->size() == 1);
+  if (current->children()->size() == 1) {
     current = PickChild(current, "startProfiling");
-    CHECK_EQ(0, current->children()->length());
+    CHECK(current->children()->empty());
   }
 }
 
@@ -585,10 +574,11 @@ static const v8::CpuProfileNode* PickChild(const v8::CpuProfileNode* parent,
                                            const char* name) {
   for (int i = 0; i < parent->GetChildrenCount(); ++i) {
     const v8::CpuProfileNode* child = parent->GetChild(i);
-    v8::String::Utf8Value function_name(child->GetFunctionName());
+    v8::String::Utf8Value function_name(CcTest::isolate(),
+                                        child->GetFunctionName());
     if (strcmp(*function_name, name) == 0) return child;
   }
-  return NULL;
+  return nullptr;
 }
 
 
@@ -659,8 +649,7 @@ int GetFunctionLineNumber(CpuProfiler& profiler, LocalContext& env,
       v8::Utils::OpenHandle(*v8::Local<v8::Function>::Cast(
           env->Global()->Get(env.local(), v8_str(name)).ToLocalChecked())));
   CodeEntry* func_entry = code_map->FindEntry(func->abstract_code()->address());
-  if (!func_entry)
-    FATAL(name);
+  if (!func_entry) FATAL("%s", name);
   return func_entry->line_number();
 }
 
@@ -711,12 +700,11 @@ TEST(BailoutReason) {
                                          .As<v8::Function>();
   i::Handle<i::JSFunction> i_function =
       i::Handle<i::JSFunction>::cast(v8::Utils::OpenHandle(*function));
-  // Set a high deopt count to trigger bail out.
-  i_function->shared()->set_opt_count(i::FLAG_max_deopt_count + 1);
-  i_function->shared()->set_deopt_count(i::FLAG_max_deopt_count + 1);
+  USE(i_function);
 
   CompileRun(
       "%OptimizeFunctionOnNextCall(Debugger);"
+      "%NeverOptimizeFunction(Debugger);"
       "Debugger();"
       "stopProfiling()");
   CHECK_EQ(1, iprofiler->GetProfilesCount());
@@ -728,11 +716,15 @@ TEST(BailoutReason) {
   // The tree should look like this:
   //  (root)
   //   ""
-  //     kDeoptimizedTooManyTimes
+  //     kOptimizationDisabledForTest
   current = PickChild(current, "");
   CHECK(const_cast<v8::CpuProfileNode*>(current));
 
   current = PickChild(current, "Debugger");
   CHECK(const_cast<v8::CpuProfileNode*>(current));
-  CHECK(!strcmp("Deoptimized too many times", current->GetBailoutReason()));
+  CHECK(!strcmp("Optimization disabled for test", current->GetBailoutReason()));
 }
+
+}  // namespace test_profile_generator
+}  // namespace internal
+}  // namespace v8

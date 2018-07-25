@@ -1037,7 +1037,7 @@ Please close rolling in case of a roll revert:
 https://v8-roll.appspot.com/
 This only works with a Google account.
 
-CQ_INCLUDE_TRYBOTS=master.tryserver.blink:linux_trusty_blink_rel;master.tryserver.chromium.linux:linux_optional_gpu_tests_rel;master.tryserver.chromium.mac:mac_optional_gpu_tests_rel;master.tryserver.chromium.win:win_optional_gpu_tests_rel;master.tryserver.chromium.android:android_optional_gpu_tests_rel
+CQ_INCLUDE_TRYBOTS=master.tryserver.blink:linux_trusty_blink_rel;luci.chromium.try:linux_optional_gpu_tests_rel;luci.chromium.try:mac_optional_gpu_tests_rel;master.tryserver.chromium.win:win_optional_gpu_tests_rel;luci.chromium.try:android_optional_gpu_tests_rel
 
 TBR=reviewer@chromium.org"""
 
@@ -1113,13 +1113,15 @@ deps = {
       Cmd("git pull", "", cwd=chrome_dir),
       Cmd("git fetch origin", ""),
       Cmd("git new-branch work-branch", "", cwd=chrome_dir),
-      Cmd("roll-dep-svn v8 roll_hsh", "rolled", cb=WriteDeps, cwd=chrome_dir),
+      Cmd("gclient setdep -r src/v8@roll_hsh", "", cb=WriteDeps,
+          cwd=chrome_dir),
       Cmd(("git commit -am \"%s\" "
            "--author \"author@chromium.org <author@chromium.org>\"" %
            self.ROLL_COMMIT_MSG),
           "", cwd=chrome_dir),
       Cmd("git cl upload --send-mail --email \"author@chromium.org\" -f "
-          "--use-commit-queue --bypass-hooks --gerrit", "", cwd=chrome_dir),
+          "--cq-dry-run --bypass-hooks --gerrit", "",
+          cwd=chrome_dir),
       Cmd("git checkout -f master", "", cwd=chrome_dir),
       Cmd("git branch -D work-branch", "", cwd=chrome_dir),
     ]

@@ -759,6 +759,10 @@ void DefineSignalConstants(Local<Object> target) {
 }
 
 void DefineOpenSSLConstants(Local<Object> target) {
+#ifdef OPENSSL_VERSION_NUMBER
+    NODE_DEFINE_CONSTANT(target, OPENSSL_VERSION_NUMBER);
+#endif
+
 #ifdef SSL_OP_ALL
     NODE_DEFINE_CONSTANT(target, SSL_OP_ALL);
 #endif
@@ -913,12 +917,8 @@ void DefineOpenSSLConstants(Local<Object> target) {
     NODE_DEFINE_CONSTANT(target, ENGINE_METHOD_RAND);
 # endif
 
-# ifdef ENGINE_METHOD_ECDH
-    NODE_DEFINE_CONSTANT(target, ENGINE_METHOD_ECDH);
-# endif
-
-# ifdef ENGINE_METHOD_ECDSA
-    NODE_DEFINE_CONSTANT(target, ENGINE_METHOD_ECDSA);
+# ifdef ENGINE_METHOD_EC
+    NODE_DEFINE_CONSTANT(target, ENGINE_METHOD_EC);
 # endif
 
 # ifdef ENGINE_METHOD_CIPHERS
@@ -927,10 +927,6 @@ void DefineOpenSSLConstants(Local<Object> target) {
 
 # ifdef ENGINE_METHOD_DIGESTS
     NODE_DEFINE_CONSTANT(target, ENGINE_METHOD_DIGESTS);
-# endif
-
-# ifdef ENGINE_METHOD_STORE
-    NODE_DEFINE_CONSTANT(target, ENGINE_METHOD_STORE);
 # endif
 
 # ifdef ENGINE_METHOD_PKEY_METHS
@@ -965,11 +961,6 @@ void DefineOpenSSLConstants(Local<Object> target) {
 
 #ifdef DH_NOT_SUITABLE_GENERATOR
     NODE_DEFINE_CONSTANT(target, DH_NOT_SUITABLE_GENERATOR);
-#endif
-
-#ifndef OPENSSL_NO_NEXTPROTONEG
-#define NPN_ENABLED 1
-    NODE_DEFINE_CONSTANT(target, NPN_ENABLED);
 #endif
 
 #ifdef TLSEXT_TYPE_application_layer_protocol_negotiation
@@ -1024,6 +1015,8 @@ void DefineOpenSSLConstants(Local<Object> target) {
 }
 
 void DefineSystemConstants(Local<Object> target) {
+  NODE_DEFINE_CONSTANT(target, UV_FS_SYMLINK_DIR);
+  NODE_DEFINE_CONSTANT(target, UV_FS_SYMLINK_JUNCTION);
   // file access modes
   NODE_DEFINE_CONSTANT(target, O_RDONLY);
   NODE_DEFINE_CONSTANT(target, O_WRONLY);
@@ -1169,6 +1162,27 @@ void DefineSystemConstants(Local<Object> target) {
 #ifdef X_OK
   NODE_DEFINE_CONSTANT(target, X_OK);
 #endif
+
+#ifdef UV_FS_COPYFILE_EXCL
+# define COPYFILE_EXCL UV_FS_COPYFILE_EXCL
+  NODE_DEFINE_CONSTANT(target, UV_FS_COPYFILE_EXCL);
+  NODE_DEFINE_CONSTANT(target, COPYFILE_EXCL);
+# undef COPYFILE_EXCL
+#endif
+
+#ifdef UV_FS_COPYFILE_FICLONE
+# define COPYFILE_FICLONE UV_FS_COPYFILE_FICLONE
+  NODE_DEFINE_CONSTANT(target, UV_FS_COPYFILE_FICLONE);
+  NODE_DEFINE_CONSTANT(target, COPYFILE_FICLONE);
+# undef COPYFILE_FICLONE
+#endif
+
+#ifdef UV_FS_COPYFILE_FICLONE_FORCE
+# define COPYFILE_FICLONE_FORCE UV_FS_COPYFILE_FICLONE_FORCE
+  NODE_DEFINE_CONSTANT(target, UV_FS_COPYFILE_FICLONE_FORCE);
+  NODE_DEFINE_CONSTANT(target, COPYFILE_FICLONE_FORCE);
+# undef COPYFILE_FICLONE_FORCE
+#endif
 }
 
 void DefineCryptoConstants(Local<Object> target) {
@@ -1180,6 +1194,7 @@ void DefineCryptoConstants(Local<Object> target) {
                               "defaultCipherList",
                               default_cipher_list);
 #endif
+  NODE_DEFINE_CONSTANT(target, INT_MAX);
 }
 
 void DefineZlibConstants(Local<Object> target) {
@@ -1267,6 +1282,35 @@ void DefineDLOpenConstants(Local<Object> target) {
 #endif
 }
 
+void DefineTraceConstants(Local<Object> target) {
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_BEGIN);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_END);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_COMPLETE);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_INSTANT);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_ASYNC_BEGIN);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_ASYNC_STEP_INTO);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_ASYNC_STEP_PAST);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_ASYNC_END);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_NESTABLE_ASYNC_BEGIN);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_NESTABLE_ASYNC_END);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_NESTABLE_ASYNC_INSTANT);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_FLOW_BEGIN);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_FLOW_STEP);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_FLOW_END);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_METADATA);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_COUNTER);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_SAMPLE);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_CREATE_OBJECT);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_SNAPSHOT_OBJECT);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_DELETE_OBJECT);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_MEMORY_DUMP);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_MARK);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_CLOCK_SYNC);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_ENTER_CONTEXT);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_LEAVE_CONTEXT);
+  NODE_DEFINE_CONSTANT(target, TRACE_EVENT_PHASE_LINK_IDS);
+}
+
 }  // anonymous namespace
 
 void DefineConstants(v8::Isolate* isolate, Local<Object> target) {
@@ -1300,6 +1344,10 @@ void DefineConstants(v8::Isolate* isolate, Local<Object> target) {
   CHECK(dlopen_constants->SetPrototype(env->context(),
                                        Null(env->isolate())).FromJust());
 
+  Local<Object> trace_constants = Object::New(isolate);
+  CHECK(trace_constants->SetPrototype(env->context(),
+                                      Null(env->isolate())).FromJust());
+
   DefineErrnoConstants(err_constants);
   DefineWindowsErrorConstants(err_constants);
   DefineSignalConstants(sig_constants);
@@ -1308,10 +1356,10 @@ void DefineConstants(v8::Isolate* isolate, Local<Object> target) {
   DefineCryptoConstants(crypto_constants);
   DefineZlibConstants(zlib_constants);
   DefineDLOpenConstants(dlopen_constants);
+  DefineTraceConstants(trace_constants);
 
   // Define libuv constants.
   NODE_DEFINE_CONSTANT(os_constants, UV_UDP_REUSEADDR);
-  NODE_DEFINE_CONSTANT(fs_constants, UV_FS_COPYFILE_EXCL);
 
   os_constants->Set(OneByteString(isolate, "dlopen"), dlopen_constants);
   os_constants->Set(OneByteString(isolate, "errno"), err_constants);
@@ -1320,6 +1368,7 @@ void DefineConstants(v8::Isolate* isolate, Local<Object> target) {
   target->Set(OneByteString(isolate, "fs"), fs_constants);
   target->Set(OneByteString(isolate, "crypto"), crypto_constants);
   target->Set(OneByteString(isolate, "zlib"), zlib_constants);
+  target->Set(OneByteString(isolate, "trace"), trace_constants);
 }
 
 }  // namespace node

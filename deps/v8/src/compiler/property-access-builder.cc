@@ -31,15 +31,6 @@ SimplifiedOperatorBuilder* PropertyAccessBuilder::simplified() const {
   return jsgraph()->simplified();
 }
 
-namespace {
-
-bool HasOnlyNumberMaps(MapHandles const& maps) {
-  for (auto map : maps) {
-    if (map->instance_type() != HEAP_NUMBER_TYPE) return false;
-  }
-  return true;
-}
-
 bool HasOnlyStringMaps(MapHandles const& maps) {
   for (auto map : maps) {
     if (!map->IsStringMap()) return false;
@@ -47,12 +38,11 @@ bool HasOnlyStringMaps(MapHandles const& maps) {
   return true;
 }
 
-bool HasOnlySequentialStringMaps(MapHandles const& maps) {
+namespace {
+
+bool HasOnlyNumberMaps(MapHandles const& maps) {
   for (auto map : maps) {
-    if (!map->IsStringMap()) return false;
-    if (!StringShape(map->instance_type()).IsSequential()) {
-      return false;
-    }
+    if (map->instance_type() != HEAP_NUMBER_TYPE) return false;
   }
   return true;
 }
@@ -63,15 +53,11 @@ bool PropertyAccessBuilder::TryBuildStringCheck(MapHandles const& maps,
                                                 Node** receiver, Node** effect,
                                                 Node* control) {
   if (HasOnlyStringMaps(maps)) {
-    if (HasOnlySequentialStringMaps(maps)) {
-      *receiver = *effect = graph()->NewNode(simplified()->CheckSeqString(),
-                                             *receiver, *effect, control);
-    } else {
-      // Monormorphic string access (ignoring the fact that there are multiple
-      // String maps).
-      *receiver = *effect = graph()->NewNode(simplified()->CheckString(),
-                                             *receiver, *effect, control);
-    }
+    // Monormorphic string access (ignoring the fact that there are multiple
+    // String maps).
+    *receiver = *effect =
+        graph()->NewNode(simplified()->CheckString(VectorSlotPair()), *receiver,
+                         *effect, control);
     return true;
   }
   return false;
@@ -82,16 +68,19 @@ bool PropertyAccessBuilder::TryBuildNumberCheck(MapHandles const& maps,
                                                 Node* control) {
   if (HasOnlyNumberMaps(maps)) {
     // Monomorphic number access (we also deal with Smis here).
-    *receiver = *effect = graph()->NewNode(simplified()->CheckNumber(),
-                                           *receiver, *effect, control);
+    *receiver = *effect =
+        graph()->NewNode(simplified()->CheckNumber(VectorSlotPair()), *receiver,
+                         *effect, control);
     return true;
   }
   return false;
 }
 
-Node* PropertyAccessBuilder::BuildCheckHeapObject(Node* receiver, Node** effect,
-                                                  Node* control) {
+namespace {
+
+bool NeedsCheckHeapObject(Node* receiver) {
   switch (receiver->opcode()) {
+    case IrOpcode::kConvertReceiver:
     case IrOpcode::kHeapConstant:
     case IrOpcode::kJSCreate:
     case IrOpcode::kJSCreateArguments:
@@ -99,22 +88,43 @@ Node* PropertyAccessBuilder::BuildCheckHeapObject(Node* receiver, Node** effect,
     case IrOpcode::kJSCreateClosure:
     case IrOpcode::kJSCreateIterResultObject:
     case IrOpcode::kJSCreateLiteralArray:
+    case IrOpcode::kJSCreateEmptyLiteralArray:
     case IrOpcode::kJSCreateLiteralObject:
+    case IrOpcode::kJSCreateEmptyLiteralObject:
     case IrOpcode::kJSCreateLiteralRegExp:
-    case IrOpcode::kJSConvertReceiver:
+    case IrOpcode::kJSCreateGeneratorObject:
+    case IrOpcode::kJSConstructForwardVarargs:
+    case IrOpcode::kJSConstruct:
+    case IrOpcode::kJSConstructWithArrayLike:
+    case IrOpcode::kJSConstructWithSpread:
     case IrOpcode::kJSToName:
     case IrOpcode::kJSToString:
     case IrOpcode::kJSToObject:
-    case IrOpcode::kJSTypeOf: {
-      return receiver;
+    case IrOpcode::kTypeOf:
+    case IrOpcode::kJSGetSuperConstructor:
+      return false;
+    case IrOpcode::kPhi: {
+      Node* control = NodeProperties::GetControlInput(receiver);
+      if (control->opcode() != IrOpcode::kMerge) return true;
+      for (int i = 0; i < receiver->InputCount() - 1; ++i) {
+        if (NeedsCheckHeapObject(receiver->InputAt(i))) return true;
+      }
+      return false;
     }
-    default: {
-      return *effect = graph()->NewNode(simplified()->CheckHeapObject(),
-                                        receiver, *effect, control);
-    }
+    default:
+      return true;
   }
-  UNREACHABLE();
-  return nullptr;
+}
+
+}  // namespace
+
+Node* PropertyAccessBuilder::BuildCheckHeapObject(Node* receiver, Node** effect,
+                                                  Node* control) {
+  if (NeedsCheckHeapObject(receiver)) {
+    receiver = *effect = graph()->NewNode(simplified()->CheckHeapObject(),
+                                          receiver, *effect, control);
+  }
+  return receiver;
 }
 
 void PropertyAccessBuilder::BuildCheckMaps(
@@ -142,6 +152,20 @@ void PropertyAccessBuilder::BuildCheckMaps(
   }
   *effect = graph()->NewNode(simplified()->CheckMaps(flags, maps), receiver,
                              *effect, control);
+}
+
+Node* PropertyAccessBuilder::BuildCheckValue(Node* receiver, Node** effect,
+                                             Node* control,
+                                             Handle<HeapObject> value) {
+  HeapObjectMatcher m(receiver);
+  if (m.Is(value)) return receiver;
+  Node* expected = jsgraph()->HeapConstant(value);
+  Node* check =
+      graph()->NewNode(simplified()->ReferenceEqual(), receiver, expected);
+  *effect =
+      graph()->NewNode(simplified()->CheckIf(DeoptimizeReason::kWrongValue),
+                       check, *effect, control);
+  return expected;
 }
 
 void PropertyAccessBuilder::AssumePrototypesStable(
@@ -224,7 +248,7 @@ Node* PropertyAccessBuilder::BuildLoadDataField(
   Node* storage = receiver;
   if (!field_index.is_inobject()) {
     storage = *effect = graph()->NewNode(
-        simplified()->LoadField(AccessBuilder::ForJSObjectProperties()),
+        simplified()->LoadField(AccessBuilder::ForJSObjectPropertiesOrHash()),
         storage, *effect, *control);
   }
   FieldAccess field_access = {

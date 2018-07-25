@@ -4,19 +4,11 @@
 
 #include <set>
 
-#include "src/factory.h"
+#include "src/heap/factory-inl.h"
 #include "src/identity-map.h"
 #include "src/isolate.h"
 #include "src/objects.h"
 #include "src/zone/zone.h"
-// FIXME(mstarzinger, marja): This is weird, but required because of the missing
-// (disallowed) include: src/factory.h -> src/objects-inl.h
-#include "src/objects-inl.h"
-// FIXME(mstarzinger, marja): This is weird, but required because of the missing
-// (disallowed) include: src/feedback-vector.h ->
-// src/feedback-vector-inl.h
-#include "src/feedback-vector-inl.h"
-#include "src/v8.h"
 #include "test/cctest/cctest.h"
 
 namespace v8 {
@@ -700,9 +692,9 @@ TEST(CanonicalHandleScope) {
   CanonicalHandleScope outer_canonical(isolate);
 
   // Deduplicate smi handles.
-  List<Handle<Object> > smi_handles;
+  std::vector<Handle<Object>> smi_handles;
   for (int i = 0; i < 100; i++) {
-    smi_handles.Add(Handle<Object>(Smi::FromInt(i), isolate));
+    smi_handles.push_back(Handle<Object>(Smi::FromInt(i), isolate));
   }
   Object** next_handle = isolate->handle_scope_data()->next;
   for (int i = 0; i < 100; i++) {
@@ -773,6 +765,7 @@ TEST(CanonicalHandleScope) {
 }
 
 TEST(GCShortCutting) {
+  ManualGCScope manual_gc_scope;
   IdentityMapTester t;
   Isolate* isolate = CcTest::i_isolate();
   Factory* factory = isolate->factory();

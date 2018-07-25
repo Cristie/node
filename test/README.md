@@ -6,7 +6,10 @@ For a detailed guide on how to write tests in this
 directory, see [the guide on writing tests](../doc/guides/writing-tests.md).
 
 On how to run tests in this directory, see
-[the contributing guide](../CONTRIBUTING.md#step-6-test).
+[the contributing guide](../doc/guides/contributing/pull-requests.md#step-6-test).
+
+For the tests to successfully run on Windows, Node.js has to be checked out from
+GitHub with the `autocrlf` git config flag set to true.
 
 ## Test Directories
 
@@ -19,7 +22,6 @@ On how to run tests in this directory, see
 |es-module          |Yes            |Test ESM module loading.|
 |fixtures           |               |Test fixtures used in various tests throughout the test suite.|
 |gc                 |No             |Tests for garbage collection related functionality.|
-|inspector          |Yes            |Tests for the V8 inspector integration.|
 |internet           |No             |Tests that make real outbound connections (mainly networking related modules). Tests for networking related modules may also be present in        other directories, but those tests do not make outbound connections.|
 |known_issues       |Yes            |Tests reproducing known issues within the system. All tests inside of this directory are expected to fail consistently. If a test doesn't fail on certain platforms, those should be skipped via `known_issues.status`.|
 |message            |Yes            |Tests for messages that are output for various conditions (```console.log```, error messages etc.)|

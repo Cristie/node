@@ -11,8 +11,8 @@
 #include "src/objects-inl.h"
 #include "test/cctest/cctest.h"
 
-using namespace v8::base;
-using namespace v8::internal;
+namespace v8 {
+namespace internal {
 
 class DeleteRecorder {
  public:
@@ -38,7 +38,7 @@ TEST(ManagedCollect) {
   isolate->RegisterForReleaseAtTeardown(&finalizer);
   {
     HandleScope scope(isolate);
-    auto handle = Managed<DeleteRecorder>::New(isolate, d1);
+    auto handle = Managed<DeleteRecorder>::From(isolate, d1);
     USE(handle);
   }
 
@@ -65,7 +65,7 @@ TEST(DisposeCollect) {
   DeleteRecorder* d2 = new DeleteRecorder(&deleted2);
   {
     HandleScope scope(i_isolate);
-    auto handle = Managed<DeleteRecorder>::New(i_isolate, d1);
+    auto handle = Managed<DeleteRecorder>::From(i_isolate, d1);
     USE(handle);
   }
   Isolate::ManagedObjectFinalizer finalizer(d2, DeleteRecorder::Deleter);
@@ -76,3 +76,23 @@ TEST(DisposeCollect) {
   CHECK(deleted1);
   CHECK(deleted2);
 }
+
+TEST(CollectOnGC) {
+  i::Isolate* i_isolate = CcTest::InitIsolateOnce();
+
+  bool deleted = false;
+  {
+    HandleScope scope(i_isolate);
+    Managed<DeleteRecorder>::Allocate(i_isolate, &deleted);
+  }
+  // TODO(ulan): It should be possible to trigger a normal gc before the
+  // "critical" one, and the "critical" one should still process pending
+  // second-pass phantom callbacks (crbug.com/v8/7628).
+  // CcTest::CollectAllGarbage();
+  CcTest::CollectAllAvailableGarbage();
+
+  CHECK(deleted);
+}
+
+}  // namespace internal
+}  // namespace v8

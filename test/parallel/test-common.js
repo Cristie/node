@@ -21,8 +21,8 @@
 
 'use strict';
 const common = require('../common');
+const fixtures = require('../common/fixtures');
 const assert = require('assert');
-const { join } = require('path');
 const { execFile } = require('child_process');
 
 // test for leaked global detection
@@ -45,12 +45,12 @@ assert.throws(function() {
 }, /^TypeError: Invalid minimum value: \/foo\/$/);
 
 // assert.fail() tests
-assert.throws(
+common.expectsError(
   () => { assert.fail('fhqwhgads'); },
-  common.expectsError({
+  {
     code: 'ERR_ASSERTION',
     message: /^fhqwhgads$/
-  }));
+  });
 
 const fnOnce = common.mustCall(() => {});
 fnOnce();
@@ -72,10 +72,10 @@ fnAtLeast2Called3();
 
 const failFixtures = [
   [
-    join(common.fixturesDir, 'failmustcall1.js'),
+    fixtures.path('failmustcall1.js'),
     'Mismatched <anonymous> function calls. Expected exactly 2, actual 1.'
   ], [
-    join(common.fixturesDir, 'failmustcall2.js'),
+    fixtures.path('failmustcall2.js'),
     'Mismatched <anonymous> function calls. Expected at least 2, actual 1.'
   ]
 ];

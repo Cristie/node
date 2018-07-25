@@ -34,14 +34,14 @@
 #include "src/base/platform/platform.h"
 #include "src/code-stubs.h"
 #include "src/double.h"
-#include "src/factory.h"
+#include "src/heap/factory.h"
 #include "src/macro-assembler.h"
 #include "src/objects-inl.h"
 #include "test/cctest/cctest.h"
 #include "test/cctest/test-code-stubs.h"
 
-using namespace v8::internal;
-
+namespace v8 {
+namespace internal {
 
 int STDCALL ConvertDToICVersion(double d) {
 #if defined(V8_TARGET_BIG_ENDIAN)
@@ -193,9 +193,12 @@ TEST(CodeStubMajorKeys) {
 #define CHECK_STUB(NAME)                        \
   {                                             \
     HandleScope scope(isolate);                 \
-    NAME##Stub stub_impl(0xabcd, isolate);      \
+    NAME##Stub stub_impl(0xABCD, isolate);      \
     CodeStub* stub = &stub_impl;                \
     CHECK_EQ(stub->MajorKey(), CodeStub::NAME); \
   }
   CODE_STUB_LIST(CHECK_STUB);
 }
+
+}  // namespace internal
+}  // namespace v8

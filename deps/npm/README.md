@@ -11,9 +11,9 @@ Much more info available via `npm help` once it's installed.
 
 ## IMPORTANT
 
-**You need node v4 or higher to run this program.**
+**You need node v6 or higher to run this program.**
 
-To install an old **and unsupported** version of npm that works on node v0.12
+To install an old **and unsupported** version of npm that works on node v5
 and prior, clone the git repo and dig through the old tags and branches.
 
 **npm is configured to use npm, Inc.'s public package registry at
@@ -141,12 +141,12 @@ you have chosen.
 
 ## More Docs
 
-Check out the [docs](https://docs.npmjs.com/),
+Check out the [docs](https://docs.npmjs.com/).
 
 You can use the `npm help` command to read any of them.
 
 If you're a developer, and you want to use npm to publish your program,
-you should [read this](https://docs.npmjs.com/misc/developers)
+you should [read this](https://docs.npmjs.com/misc/developers).
 
 ## BUGS
 

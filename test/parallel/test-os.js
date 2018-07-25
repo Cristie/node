@@ -28,7 +28,7 @@ const { inspect } = require('util');
 
 const is = {
   number: (value, key) => {
-    assert(!isNaN(value), `${key} should not be NaN`);
+    assert(!Number.isNaN(value), `${key} should not be NaN`);
     assert.strictEqual(typeof value, 'number');
   },
   string: (value) => { assert.strictEqual(typeof value, 'string'); },
@@ -100,7 +100,7 @@ assert.ok(type.length > 0);
 const release = os.release();
 is.string(release);
 assert.ok(release.length > 0);
-//TODO: Check format on more than just AIX
+// TODO: Check format on more than just AIX
 if (common.isAIX)
   assert.ok(/^\d+\.\d+$/.test(release));
 
@@ -113,7 +113,7 @@ is.string(arch);
 assert.ok(arch.length > 0);
 
 if (!common.isSunOS) {
-  // not implemeneted yet
+  // not implemented yet
   assert.ok(os.loadavg().length > 0);
   assert.ok(os.freemem() > 0);
   assert.ok(os.totalmem() > 0);
@@ -208,7 +208,11 @@ if (common.isWindows) {
 } else {
   is.number(pwd.uid);
   is.number(pwd.gid);
-  assert.ok(pwd.shell.includes(path.sep));
+  assert.strictEqual(typeof pwd.shell, 'string');
+  // It's possible for /etc/passwd to leave the user's shell blank.
+  if (pwd.shell.length > 0) {
+    assert(pwd.shell.includes(path.sep));
+  }
   assert.strictEqual(pwd.uid, pwdBuf.uid);
   assert.strictEqual(pwd.gid, pwdBuf.gid);
   assert.strictEqual(pwd.shell, pwdBuf.shell.toString('utf8'));

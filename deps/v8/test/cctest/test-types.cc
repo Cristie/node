@@ -5,21 +5,16 @@
 #include <vector>
 
 #include "src/compiler/types.h"
-#include "src/factory.h"
+#include "src/heap/factory-inl.h"
 #include "src/heap/heap.h"
 #include "src/isolate.h"
-// FIXME(mstarzinger, marja): This is weird, but required because of the missing
-// (disallowed) include: src/factory.h -> src/objects-inl.h
-#include "src/objects-inl.h"
-// FIXME(mstarzinger, marja): This is weird, but required because of the missing
-// (disallowed) include: src/feedback-vector.h ->
-// src/feedback-vector-inl.h
-#include "src/feedback-vector-inl.h"
+#include "src/objects.h"
 #include "test/cctest/cctest.h"
 #include "test/cctest/types-fuzz.h"
 
-using namespace v8::internal;
-using namespace v8::internal::compiler;
+namespace v8 {
+namespace internal {
+namespace compiler {
 
 namespace {
 
@@ -105,9 +100,8 @@ struct Tests {
   void IsSomeType() {
     for (TypeIterator it = T.types.begin(); it != T.types.end(); ++it) {
       Type* t = *it;
-      CHECK(1 ==
-            this->IsBitset(t) + t->IsHeapConstant() + t->IsRange() +
-                t->IsOtherNumberConstant() + this->IsUnion(t));
+      CHECK_EQ(1, this->IsBitset(t) + t->IsHeapConstant() + t->IsRange() +
+                      t->IsOtherNumberConstant() + this->IsUnion(t));
     }
   }
 
@@ -117,7 +111,7 @@ struct Tests {
     CHECK(this->IsBitset(T.Any));
 
     CHECK(bitset(0) == this->AsBitset(T.None));
-    CHECK(bitset(0xfffffffeu) == this->AsBitset(T.Any));
+    CHECK(bitset(0xFFFFFFFEu) == this->AsBitset(T.Any));
 
     // Union(T1, T2) is bitset for bitsets T1,T2
     for (TypeIterator it1 = T.types.begin(); it1 != T.types.end(); ++it1) {
@@ -230,38 +224,38 @@ struct Tests {
     Factory* fac = isolate->factory();
     CHECK(T.NewConstant(fac->NewNumber(0))->Is(T.UnsignedSmall));
     CHECK(T.NewConstant(fac->NewNumber(1))->Is(T.UnsignedSmall));
-    CHECK(T.NewConstant(fac->NewNumber(0x3fffffff))->Is(T.UnsignedSmall));
+    CHECK(T.NewConstant(fac->NewNumber(0x3FFFFFFF))->Is(T.UnsignedSmall));
     CHECK(T.NewConstant(fac->NewNumber(-1))->Is(T.Negative31));
-    CHECK(T.NewConstant(fac->NewNumber(-0x3fffffff))->Is(T.Negative31));
+    CHECK(T.NewConstant(fac->NewNumber(-0x3FFFFFFF))->Is(T.Negative31));
     CHECK(T.NewConstant(fac->NewNumber(-0x40000000))->Is(T.Negative31));
     CHECK(T.NewConstant(fac->NewNumber(0x40000000))->Is(T.Unsigned31));
     CHECK(!T.NewConstant(fac->NewNumber(0x40000000))->Is(T.Unsigned30));
-    CHECK(T.NewConstant(fac->NewNumber(0x7fffffff))->Is(T.Unsigned31));
-    CHECK(!T.NewConstant(fac->NewNumber(0x7fffffff))->Is(T.Unsigned30));
+    CHECK(T.NewConstant(fac->NewNumber(0x7FFFFFFF))->Is(T.Unsigned31));
+    CHECK(!T.NewConstant(fac->NewNumber(0x7FFFFFFF))->Is(T.Unsigned30));
     CHECK(T.NewConstant(fac->NewNumber(-0x40000001))->Is(T.Negative32));
     CHECK(!T.NewConstant(fac->NewNumber(-0x40000001))->Is(T.Negative31));
-    CHECK(T.NewConstant(fac->NewNumber(-0x7fffffff))->Is(T.Negative32));
-    CHECK(!T.NewConstant(fac->NewNumber(-0x7fffffff - 1))->Is(T.Negative31));
+    CHECK(T.NewConstant(fac->NewNumber(-0x7FFFFFFF))->Is(T.Negative32));
+    CHECK(!T.NewConstant(fac->NewNumber(-0x7FFFFFFF - 1))->Is(T.Negative31));
     if (SmiValuesAre31Bits()) {
       CHECK(!T.NewConstant(fac->NewNumber(0x40000000))->Is(T.UnsignedSmall));
-      CHECK(!T.NewConstant(fac->NewNumber(0x7fffffff))->Is(T.UnsignedSmall));
+      CHECK(!T.NewConstant(fac->NewNumber(0x7FFFFFFF))->Is(T.UnsignedSmall));
       CHECK(!T.NewConstant(fac->NewNumber(-0x40000001))->Is(T.SignedSmall));
-      CHECK(!T.NewConstant(fac->NewNumber(-0x7fffffff - 1))->Is(T.SignedSmall));
+      CHECK(!T.NewConstant(fac->NewNumber(-0x7FFFFFFF - 1))->Is(T.SignedSmall));
     } else {
       CHECK(SmiValuesAre32Bits());
       CHECK(T.NewConstant(fac->NewNumber(0x40000000))->Is(T.UnsignedSmall));
-      CHECK(T.NewConstant(fac->NewNumber(0x7fffffff))->Is(T.UnsignedSmall));
+      CHECK(T.NewConstant(fac->NewNumber(0x7FFFFFFF))->Is(T.UnsignedSmall));
       CHECK(T.NewConstant(fac->NewNumber(-0x40000001))->Is(T.SignedSmall));
-      CHECK(T.NewConstant(fac->NewNumber(-0x7fffffff - 1))->Is(T.SignedSmall));
+      CHECK(T.NewConstant(fac->NewNumber(-0x7FFFFFFF - 1))->Is(T.SignedSmall));
     }
     CHECK(T.NewConstant(fac->NewNumber(0x80000000u))->Is(T.Unsigned32));
     CHECK(!T.NewConstant(fac->NewNumber(0x80000000u))->Is(T.Unsigned31));
-    CHECK(T.NewConstant(fac->NewNumber(0xffffffffu))->Is(T.Unsigned32));
-    CHECK(!T.NewConstant(fac->NewNumber(0xffffffffu))->Is(T.Unsigned31));
-    CHECK(T.NewConstant(fac->NewNumber(0xffffffffu + 1.0))->Is(T.PlainNumber));
-    CHECK(!T.NewConstant(fac->NewNumber(0xffffffffu + 1.0))->Is(T.Integral32));
-    CHECK(T.NewConstant(fac->NewNumber(-0x7fffffff - 2.0))->Is(T.PlainNumber));
-    CHECK(!T.NewConstant(fac->NewNumber(-0x7fffffff - 2.0))->Is(T.Integral32));
+    CHECK(T.NewConstant(fac->NewNumber(0xFFFFFFFFu))->Is(T.Unsigned32));
+    CHECK(!T.NewConstant(fac->NewNumber(0xFFFFFFFFu))->Is(T.Unsigned31));
+    CHECK(T.NewConstant(fac->NewNumber(0xFFFFFFFFu + 1.0))->Is(T.PlainNumber));
+    CHECK(!T.NewConstant(fac->NewNumber(0xFFFFFFFFu + 1.0))->Is(T.Integral32));
+    CHECK(T.NewConstant(fac->NewNumber(-0x7FFFFFFF - 2.0))->Is(T.PlainNumber));
+    CHECK(!T.NewConstant(fac->NewNumber(-0x7FFFFFFF - 2.0))->Is(T.Integral32));
     CHECK(T.NewConstant(fac->NewNumber(0.1))->Is(T.PlainNumber));
     CHECK(!T.NewConstant(fac->NewNumber(0.1))->Is(T.Integral32));
     CHECK(T.NewConstant(fac->NewNumber(-10.1))->Is(T.PlainNumber));
@@ -279,11 +273,11 @@ struct Tests {
 
     // Typing of Strings
     Handle<String> s1 = fac->NewStringFromAsciiChecked("a");
-    CHECK(T.NewConstant(s1)->Is(T.InternalizedSeqString));
+    CHECK(T.NewConstant(s1)->Is(T.InternalizedString));
     const uc16 two_byte[1] = {0x2603};
     Handle<String> s2 =
         fac->NewTwoByteInternalizedString(Vector<const uc16>(two_byte, 1), 1);
-    CHECK(T.NewConstant(s2)->Is(T.InternalizedSeqString));
+    CHECK(T.NewConstant(s2)->Is(T.InternalizedString));
   }
 
   void Range() {
@@ -419,7 +413,7 @@ struct Tests {
     // T->Is(Range(T->Min(), T->Max())).
     for (TypeIterator it = T.types.begin(); it != T.types.end(); ++it) {
       Type* type = *it;
-      CHECK(!type->Is(T.Integer) || !type->IsInhabited() ||
+      CHECK(!type->Is(T.Integer) || type->IsNone() ||
             type->Is(T.Range(type->Min(), type->Max())));
     }
   }
@@ -548,7 +542,7 @@ struct Tests {
               (type1->IsRange() && type2->IsRange()) ||
               (type1->IsOtherNumberConstant() &&
                type2->IsOtherNumberConstant()) ||
-              !type1->IsInhabited());
+              type1->IsNone());
       }
     }
   }
@@ -627,14 +621,9 @@ struct Tests {
 
     CheckSub(T.UniqueName, T.Name);
     CheckSub(T.String, T.Name);
-    CheckSub(T.InternalizedSeqString, T.InternalizedString);
-    CheckSub(T.InternalizedNonSeqString, T.InternalizedString);
     CheckSub(T.InternalizedString, T.String);
     CheckSub(T.InternalizedString, T.UniqueName);
     CheckSub(T.InternalizedString, T.Name);
-    CheckSub(T.OtherSeqString, T.OtherString);
-    CheckSub(T.OtherNonSeqString, T.OtherString);
-    CheckSub(T.OtherString, T.String);
     CheckSub(T.Symbol, T.UniqueName);
     CheckSub(T.Symbol, T.Name);
     CheckUnordered(T.String, T.UniqueName);
@@ -672,7 +661,7 @@ struct Tests {
     // T->Maybe(Any) iff T inhabited
     for (TypeIterator it = T.types.begin(); it != T.types.end(); ++it) {
       Type* type = *it;
-      CHECK(type->Maybe(T.Any) == type->IsInhabited());
+      CHECK(type->Maybe(T.Any) == !type->IsNone());
     }
 
     // T->Maybe(None) never
@@ -684,7 +673,7 @@ struct Tests {
     // Reflexivity upto Inhabitation: T->Maybe(T) iff T inhabited
     for (TypeIterator it = T.types.begin(); it != T.types.end(); ++it) {
       Type* type = *it;
-      CHECK(type->Maybe(type) == type->IsInhabited());
+      CHECK(type->Maybe(type) == !type->IsNone());
     }
 
     // Symmetry: T1->Maybe(T2) iff T2->Maybe(T1)
@@ -701,8 +690,7 @@ struct Tests {
       for (TypeIterator it2 = T.types.begin(); it2 != T.types.end(); ++it2) {
         Type* type1 = *it1;
         Type* type2 = *it2;
-        CHECK(!type1->Maybe(type2) ||
-              (type1->IsInhabited() && type2->IsInhabited()));
+        CHECK(!type1->Maybe(type2) || (!type1->IsNone() && !type2->IsNone()));
       }
     }
 
@@ -712,7 +700,7 @@ struct Tests {
         Type* type1 = *it1;
         Type* type2 = *it2;
         Type* intersect12 = T.Intersect(type1, type2);
-        CHECK(!type1->Maybe(type2) || intersect12->IsInhabited());
+        CHECK(!type1->Maybe(type2) || !intersect12->IsNone());
       }
     }
 
@@ -721,8 +709,7 @@ struct Tests {
       for (TypeIterator it2 = T.types.begin(); it2 != T.types.end(); ++it2) {
         Type* type1 = *it1;
         Type* type2 = *it2;
-        CHECK(!(type1->Is(type2) && type1->IsInhabited()) ||
-              type1->Maybe(type2));
+        CHECK(!(type1->Is(type2) && !type1->IsNone()) || type1->Maybe(type2));
       }
     }
 
@@ -758,15 +745,10 @@ struct Tests {
     CheckOverlap(T.NaN, T.Number);
     CheckDisjoint(T.Signed32, T.NaN);
     CheckOverlap(T.UniqueName, T.Name);
-    CheckOverlap(T.InternalizedNonSeqString, T.InternalizedString);
-    CheckOverlap(T.InternalizedSeqString, T.InternalizedString);
-    CheckOverlap(T.OtherNonSeqString, T.OtherString);
-    CheckOverlap(T.OtherSeqString, T.OtherString);
     CheckOverlap(T.String, T.Name);
     CheckOverlap(T.InternalizedString, T.String);
     CheckOverlap(T.InternalizedString, T.UniqueName);
     CheckOverlap(T.InternalizedString, T.Name);
-    CheckOverlap(T.OtherString, T.String);
     CheckOverlap(T.Symbol, T.UniqueName);
     CheckOverlap(T.Symbol, T.Name);
     CheckOverlap(T.String, T.UniqueName);
@@ -1131,3 +1113,7 @@ TEST(Intersect) { Tests().Intersect(); }
 TEST(Distributivity) { Tests().Distributivity(); }
 
 TEST(GetRange) { Tests().GetRange(); }
+
+}  // namespace compiler
+}  // namespace internal
+}  // namespace v8

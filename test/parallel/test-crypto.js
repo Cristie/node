@@ -30,8 +30,6 @@ const crypto = require('crypto');
 const tls = require('tls');
 const fixtures = require('../common/fixtures');
 
-crypto.DEFAULT_ENCODING = 'buffer';
-
 // Test Certificates
 const caPem = fixtures.readSync('test_ca.pem', 'ascii');
 const certPem = fixtures.readSync('test_cert.pem', 'ascii');
@@ -56,9 +54,7 @@ assert.throws(function() {
 });
 
 // PFX tests
-assert.doesNotThrow(function() {
-  tls.createSecureContext({ pfx: certPfx, passphrase: 'sample' });
-});
+tls.createSecureContext({ pfx: certPfx, passphrase: 'sample' });
 
 assert.throws(function() {
   tls.createSecureContext({ pfx: certPfx });
@@ -132,18 +128,18 @@ const noCapitals = /^[^A-Z]+$/;
 assert(tlsCiphers.every((value) => noCapitals.test(value)));
 validateList(tlsCiphers);
 
-// Assert that we have sha and sha1 but not SHA and SHA1.
-assert.notStrictEqual(0, crypto.getHashes().length);
+// Assert that we have sha1 and sha256 but not SHA1 and SHA256.
+assert.notStrictEqual(crypto.getHashes().length, 0);
 assert(crypto.getHashes().includes('sha1'));
-assert(crypto.getHashes().includes('sha'));
+assert(crypto.getHashes().includes('sha256'));
 assert(!crypto.getHashes().includes('SHA1'));
-assert(!crypto.getHashes().includes('SHA'));
+assert(!crypto.getHashes().includes('SHA256'));
 assert(crypto.getHashes().includes('RSA-SHA1'));
 assert(!crypto.getHashes().includes('rsa-sha1'));
 validateList(crypto.getHashes());
 
 // Assume that we have at least secp384r1.
-assert.notStrictEqual(0, crypto.getCurves().length);
+assert.notStrictEqual(crypto.getCurves().length, 0);
 assert(crypto.getCurves().includes('secp384r1'));
 assert(!crypto.getCurves().includes('SECP384R1'));
 validateList(crypto.getCurves());
@@ -162,8 +158,8 @@ testImmutability(tls.getCiphers);
 testImmutability(crypto.getHashes);
 testImmutability(crypto.getCurves);
 
-// Regression tests for #5725: hex input that's not a power of two should
-// throw, not assert in C++ land.
+// Regression tests for https://github.com/nodejs/node-v0.x-archive/pull/5725:
+// hex input that's not a power of two should throw, not assert in C++ land.
 assert.throws(function() {
   crypto.createCipher('aes192', 'test').update('0', 'hex');
 }, (err) => {
@@ -192,28 +188,6 @@ assert.throws(function() {
 
 assert.throws(function() {
   crypto.createHash('sha1').update('0', 'hex');
-}, (err) => {
-  // Throws TypeError, so there is no opensslErrorStack property.
-  if ((err instanceof Error) &&
-      /^TypeError: Bad input string$/.test(err) &&
-      err.opensslErrorStack === undefined) {
-    return true;
-  }
-});
-
-assert.throws(function() {
-  crypto.createSign('SHA1').update('0', 'hex');
-}, (err) => {
-  // Throws TypeError, so there is no opensslErrorStack property.
-  if ((err instanceof Error) &&
-      /^TypeError: Bad input string$/.test(err) &&
-      err.opensslErrorStack === undefined) {
-    return true;
-  }
-});
-
-assert.throws(function() {
-  crypto.createVerify('SHA1').update('0', 'hex');
 }, (err) => {
   // Throws TypeError, so there is no opensslErrorStack property.
   if ((err instanceof Error) &&
@@ -260,7 +234,7 @@ assert.throws(function() {
   // Throws crypto error, so there is an opensslErrorStack property.
   // The openSSL stack should have content.
   if ((err instanceof Error) &&
-      /asn1 encoding routines:ASN1_CHECK_TLEN:wrong tag/.test(err) &&
+      /asn1 encoding routines:[^:]*:wrong tag/.test(err) &&
       err.opensslErrorStack !== undefined &&
       Array.isArray(err.opensslErrorStack) &&
       err.opensslErrorStack.length > 0) {
@@ -284,7 +258,7 @@ assert.throws(function() {
 
 /**
  * Check if the stream function uses utf8 as a default encoding.
- **/
+ */
 
 function testEncoding(options, assertionHash) {
   const hash = crypto.createHash('sha256', options);

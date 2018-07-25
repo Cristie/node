@@ -25,8 +25,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Flags: --allow-natives-syntax --expose-gc
-// Flags: --no-always-opt --opt --no-stress-fullcodegen
+// Flags: --allow-natives-syntax --expose-gc --no-always-opt --opt
 
 // Test element kind of objects.
 
@@ -107,13 +106,8 @@ function assertKind(expected, obj, name_opt) {
   a = bar(10);
   assertKind(elements_kind.fast, a);
   assertOptimized(bar);
-  bar(100000);
+  bar(10000);
   assertOptimized(bar);
-
-  // If the argument isn't a smi, things should still work.
-  a = bar("oops");
-  assertOptimized(bar);
-  assertKind(elements_kind.fast, a);
 
   function barn(one, two, three) {
     return new Array(one, two, three);

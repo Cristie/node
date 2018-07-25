@@ -11,9 +11,9 @@
 #include "src/api.h"
 #include "src/compilation-cache.h"
 #include "src/execution.h"
-#include "src/factory.h"
 #include "src/field-type.h"
 #include "src/global-handles.h"
+#include "src/heap/factory.h"
 #include "src/heap/incremental-marking.h"
 #include "src/heap/spaces.h"
 #include "src/ic/ic.h"
@@ -24,8 +24,9 @@
 #include "test/cctest/cctest.h"
 #include "test/cctest/heap/heap-utils.h"
 
-using namespace v8::base;
-using namespace v8::internal;
+namespace v8 {
+namespace internal {
+namespace test_unboxed_doubles {
 
 #if V8_DOUBLE_FIELDS_UNBOXING
 
@@ -117,7 +118,7 @@ static Handle<DescriptorArray> CreateDescriptorArray(Isolate* isolate,
     Descriptor d;
     if (kind == PROP_ACCESSOR_INFO) {
       Handle<AccessorInfo> info =
-          Accessors::MakeAccessor(isolate, name, nullptr, nullptr, NONE);
+          Accessors::MakeAccessor(isolate, name, nullptr, nullptr);
       d = Descriptor::AccessorConstant(name, info, NONE);
 
     } else {
@@ -226,7 +227,7 @@ TEST(LayoutDescriptorBasicSlow) {
     CHECK_NE(LayoutDescriptor::FastPointerLayout(), *layout_descriptor);
     CHECK(layout_descriptor->IsSlowLayout());
     CHECK(!layout_descriptor->IsFastPointerLayout());
-    CHECK(layout_descriptor->capacity() > kSmiValueSize);
+    CHECK_GT(layout_descriptor->capacity(), kSmiValueSize);
 
     CHECK(!layout_descriptor->IsTagged(0));
     CHECK(!layout_descriptor->IsTagged(kPropsCount - 1));
@@ -306,7 +307,7 @@ static void TestLayoutDescriptorQueries(int layout_descriptor_length,
       int sequence_length;
       CHECK_EQ(tagged,
                layout_desc->IsTagged(i, max_sequence_length, &sequence_length));
-      CHECK(sequence_length > 0);
+      CHECK_GT(sequence_length, 0);
 
       CHECK_EQ(expected_sequence_length, sequence_length);
     }
@@ -327,7 +328,7 @@ static void TestLayoutDescriptorQueriesFast(int max_sequence_length) {
     for (int i = 0; i < kNumberOfBits; i++) {
       CHECK_EQ(true,
                layout_desc->IsTagged(i, max_sequence_length, &sequence_length));
-      CHECK(sequence_length > 0);
+      CHECK_GT(sequence_length, 0);
       CHECK_EQ(max_sequence_length, sequence_length);
     }
   }
@@ -436,7 +437,7 @@ static void TestLayoutDescriptorQueriesSlow(int max_sequence_length) {
       bit_flip_positions[i] = cur;
       cur = (cur + 1) * 2;
     }
-    CHECK(cur < 10000);
+    CHECK_LT(cur, 10000);
     bit_flip_positions[kMaxNumberOfDescriptors] = 10000;
     TestLayoutDescriptorQueries(kMaxNumberOfDescriptors, bit_flip_positions,
                                 max_sequence_length);
@@ -449,7 +450,7 @@ static void TestLayoutDescriptorQueriesSlow(int max_sequence_length) {
       bit_flip_positions[i] = cur;
       cur = (cur + 1) * 2;
     }
-    CHECK(cur < 10000);
+    CHECK_LT(cur, 10000);
     bit_flip_positions[kMaxNumberOfDescriptors] = 10000;
     TestLayoutDescriptorQueries(kMaxNumberOfDescriptors, bit_flip_positions,
                                 max_sequence_length);
@@ -641,7 +642,7 @@ static Handle<LayoutDescriptor> TestLayoutDescriptorAppend(
     Descriptor d;
     if (kind == PROP_ACCESSOR_INFO) {
       Handle<AccessorInfo> info =
-          Accessors::MakeAccessor(isolate, name, nullptr, nullptr, NONE);
+          Accessors::MakeAccessor(isolate, name, nullptr, nullptr);
       d = Descriptor::AccessorConstant(name, info, NONE);
 
     } else {
@@ -1110,7 +1111,7 @@ TEST(DoScavenge) {
 
 TEST(DoScavengeWithIncrementalWriteBarrier) {
   if (FLAG_never_compact || !FLAG_incremental_marking) return;
-  FLAG_stress_incremental_marking = false;
+  ManualGCScope manual_gc_scope;
   CcTest::InitializeVM();
   v8::HandleScope scope(CcTest::isolate());
   Isolate* isolate = CcTest::i_isolate();
@@ -1178,7 +1179,9 @@ TEST(DoScavengeWithIncrementalWriteBarrier) {
   // in compacting mode and |obj_value|'s page is an evacuation candidate).
   IncrementalMarking* marking = heap->incremental_marking();
   CHECK(marking->IsCompacting());
-  CHECK(ObjectMarking::IsBlack(*obj, MarkingState::Internal(*obj)));
+  IncrementalMarking::MarkingState* marking_state =
+      heap->incremental_marking()->marking_state();
+  CHECK(marking_state->IsBlack(*obj));
   CHECK(MarkCompactCollector::IsOnEvacuationCandidate(*obj_value));
 
   // Trigger GCs so that |obj| moves to old gen.
@@ -1232,8 +1235,8 @@ static void TestLayoutDescriptorHelper(Isolate* isolate,
     CHECK_EQ(expected_tagged, helper.IsTagged(index.offset()));
     CHECK_EQ(expected_tagged, helper.IsTagged(index.offset(), instance_size,
                                               &end_of_region_offset));
-    CHECK(end_of_region_offset > 0);
-    CHECK(end_of_region_offset % kPointerSize == 0);
+    CHECK_GT(end_of_region_offset, 0);
+    CHECK_EQ(end_of_region_offset % kPointerSize, 0);
     CHECK(end_of_region_offset <= instance_size);
 
     for (int offset = index.offset(); offset < end_of_region_offset;
@@ -1459,7 +1462,7 @@ static void TestIncrementalWriteBarrier(Handle<Map> map, Handle<Map> new_map,
                                         int double_descriptor,
                                         bool check_tagged_value = true) {
   if (FLAG_never_compact || !FLAG_incremental_marking) return;
-  FLAG_stress_incremental_marking = false;
+  ManualGCScope manual_gc_scope;
   FLAG_manual_evacuation_candidates_selection = true;
   Isolate* isolate = CcTest::i_isolate();
   Factory* factory = isolate->factory();
@@ -1499,8 +1502,9 @@ static void TestIncrementalWriteBarrier(Handle<Map> map, Handle<Map> new_map,
   // still active and |obj_value|'s page is indeed an evacuation candidate).
   IncrementalMarking* marking = heap->incremental_marking();
   CHECK(marking->IsMarking());
-  CHECK(ObjectMarking::IsBlack(*obj, MarkingState::Internal(*obj)));
-  CHECK(ObjectMarking::IsBlack(*obj_value, MarkingState::Internal(*obj_value)));
+  IncrementalMarking::MarkingState* marking_state = marking->marking_state();
+  CHECK(marking_state->IsBlack(*obj));
+  CHECK(marking_state->IsBlack(*obj_value));
   CHECK(MarkCompactCollector::IsOnEvacuationCandidate(*obj_value));
 
   // Trigger incremental write barrier, which should add a slot to remembered
@@ -1515,7 +1519,7 @@ static void TestIncrementalWriteBarrier(Handle<Map> map, Handle<Map> new_map,
   // barrier.
   JSObject::MigrateToMap(obj, new_map);
 
-  uint64_t boom_value = UINT64_C(0xbaad0176a37c28e1);
+  uint64_t boom_value = UINT64_C(0xBAAD0176A37C28E1);
 
   FieldIndex double_field_index =
       FieldIndex::ForDescriptor(*new_map, double_descriptor);
@@ -1542,7 +1546,7 @@ enum OldToWriteBarrierKind {
 };
 static void TestWriteBarrierObjectShiftFieldsRight(
     OldToWriteBarrierKind write_barrier_kind) {
-  FLAG_stress_incremental_marking = false;
+  ManualGCScope manual_gc_scope;
   CcTest::InitializeVM();
   Isolate* isolate = CcTest::i_isolate();
   v8::HandleScope scope(CcTest::isolate());
@@ -1594,3 +1598,7 @@ TEST(IncrementalWriteBarrierObjectShiftFieldsRight) {
 // Map::ReconfigureProperty() supports that.
 
 #endif
+
+}  // namespace test_unboxed_doubles
+}  // namespace internal
+}  // namespace v8

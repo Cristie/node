@@ -31,7 +31,7 @@
 
 #include "include/v8-profiler.h"
 #include "src/api.h"
-#include "src/codegen.h"
+#include "src/code-stubs.h"
 #include "src/disassembler.h"
 #include "src/isolate.h"
 #include "src/log.h"
@@ -41,19 +41,8 @@
 #include "test/cctest/cctest.h"
 #include "test/cctest/trace-extension.h"
 
-using v8::Function;
-using v8::Local;
-using v8::Object;
-using v8::Script;
-using v8::String;
-using v8::TickSample;
-using v8::Value;
-
-using v8::internal::byte;
-using v8::internal::Address;
-using v8::internal::Handle;
-using v8::internal::Isolate;
-using v8::internal::JSFunction;
+namespace v8 {
+namespace internal {
 
 static bool IsAddressWithinFuncCode(JSFunction* function, void* addr) {
   Address address = reinterpret_cast<Address>(addr);
@@ -97,7 +86,7 @@ static void construct_call(const v8::FunctionCallbackInfo<v8::Value>& args) {
       .FromJust();
 #elif defined(V8_HOST_ARCH_64_BIT)
   uint64_t fp = reinterpret_cast<uint64_t>(calling_frame->fp());
-  int32_t low_bits = static_cast<int32_t>(fp & 0xffffffff);
+  int32_t low_bits = static_cast<int32_t>(fp & 0xFFFFFFFF);
   int32_t high_bits = static_cast<int32_t>(fp >> 32);
   args.This()->Set(context, v8_str("low_bits"), v8_num(low_bits)).FromJust();
   args.This()->Set(context, v8_str("high_bits"), v8_num(high_bits)).FromJust();
@@ -294,3 +283,6 @@ TEST(JsEntrySp) {
   CompileRun("js_entry_sp_level2();");
   CHECK(!i::TraceExtension::GetJsEntrySp());
 }
+
+}  // namespace internal
+}  // namespace v8

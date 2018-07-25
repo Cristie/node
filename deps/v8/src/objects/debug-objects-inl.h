@@ -18,6 +18,7 @@ namespace internal {
 CAST_ACCESSOR(BreakPointInfo)
 CAST_ACCESSOR(DebugInfo)
 CAST_ACCESSOR(CoverageInfo)
+CAST_ACCESSOR(BreakPoint)
 
 SMI_ACCESSORS(DebugInfo, flags, kFlagsOffset)
 ACCESSORS(DebugInfo, shared, SharedFunctionInfo, kSharedFunctionInfoOffset)
@@ -27,32 +28,23 @@ ACCESSORS(DebugInfo, break_points, FixedArray, kBreakPointsStateOffset)
 ACCESSORS(DebugInfo, coverage_info, Object, kCoverageInfoOffset)
 
 SMI_ACCESSORS(BreakPointInfo, source_position, kSourcePositionOffset)
-ACCESSORS(BreakPointInfo, break_point_objects, Object, kBreakPointObjectsOffset)
+ACCESSORS(BreakPointInfo, break_points, Object, kBreakPointsOffset)
+
+SMI_ACCESSORS(BreakPoint, id, kIdOffset)
+ACCESSORS(BreakPoint, condition, String, kConditionOffset)
 
 bool DebugInfo::HasDebugBytecodeArray() {
   return debug_bytecode_array()->IsBytecodeArray();
 }
 
-bool DebugInfo::HasDebugCode() {
-  Code* code = shared()->code();
-  bool has = code->kind() == Code::FUNCTION;
-  DCHECK(!has || code->has_debug_break_slots());
-  return has;
-}
-
 BytecodeArray* DebugInfo::OriginalBytecodeArray() {
   DCHECK(HasDebugBytecodeArray());
-  return shared()->bytecode_array();
+  return shared()->GetBytecodeArray();
 }
 
 BytecodeArray* DebugInfo::DebugBytecodeArray() {
   DCHECK(HasDebugBytecodeArray());
   return BytecodeArray::cast(debug_bytecode_array());
-}
-
-Code* DebugInfo::DebugCode() {
-  DCHECK(HasDebugCode());
-  return shared()->code();
 }
 
 }  // namespace internal

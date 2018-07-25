@@ -2,32 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Flags: --allow-natives-syntax --no-always-opt --ignition --block-coverage --harmony-async-iteration
-// Flags: --no-stress-fullcodegen
-
-// Test precise code coverage.
-
-function GetCoverage(source) {
-  for (var script of %DebugCollectCoverage()) {
-    if (script.script.source == source) return script;
-  }
-  return undefined;
-}
-
-function TestCoverage(name, source, expectation) {
-  source = source.trim();
-  eval(source);
-  %CollectGarbage("collect dead objects");
-  var covfefe = GetCoverage(source);
-  var stringified_result = JSON.stringify(covfefe);
-  var stringified_expectation = JSON.stringify(expectation);
-  if (stringified_result != stringified_expectation) {
-    print(stringified_result.replace(/[}],[{]/g, "},\n {"));
-  }
-  assertEquals(stringified_expectation, stringified_result, name + " failed");
-}
-
-function nop() {}
+// Flags: --allow-natives-syntax --no-always-opt
+// Files: test/mjsunit/code-coverage-utils.js
 
 %DebugToggleBlockCoverage(true);
 
@@ -62,20 +38,23 @@ function f(x) {                           // 0050
 }                                         // 0550
 f(42);                                    // 0600
 f(43);                                    // 0650
+if (true) {                               // 0700
+  const foo = 'bar';                      // 0750
+} else {                                  // 0800
+  const bar = 'foo';                      // 0850
+}                                         // 0900
 `,
-[{"start":0,"end":699,"count":1},
+[{"start":0,"end":949,"count":1},
+ {"start":801,"end":901,"count":0},
  {"start":0,"end":15,"count":11},
  {"start":50,"end":551,"count":2},
  {"start":115,"end":203,"count":1},
  {"start":167,"end":171,"count":0},
- {"start":265,"end":273,"count":1},
- {"start":279,"end":287,"count":1},
- {"start":315,"end":319,"count":1},
- {"start":325,"end":329,"count":1},
+ {"start":265,"end":287,"count":1},
+ {"start":315,"end":329,"count":1},
  {"start":363,"end":367,"count":0},
  {"start":413,"end":417,"count":0},
- {"start":472,"end":476,"count":0}]
-
+ {"start":466,"end":476,"count":0}]
 );
 
 TestCoverage(
@@ -92,7 +71,7 @@ TestCoverage(
 `,
 [{"start":0,"end":399,"count":1},
  {"start":1,"end":351,"count":1},
- {"start":161,"end":351,"count":0}]
+ {"start":161,"end":350,"count":0}]
 );
 
 TestCoverage(
@@ -106,7 +85,7 @@ TestCoverage(
 `,
 [{"start":0,"end":249,"count":1},
  {"start":1,"end":201,"count":1},
- {"start":124,"end":129,"count":0}]
+ {"start":118,"end":129,"count":0}]
 );
 
 TestCoverage(
@@ -133,7 +112,7 @@ function g() {}                           // 0000
  {"start":330,"end":334,"count":0},
  {"start":431,"end":503,"count":12},
  {"start":470,"end":474,"count":4},
- {"start":480,"end":484,"count":8}]
+ {"start":474,"end":484,"count":8}]
 );
 
 TestCoverage(
@@ -201,7 +180,7 @@ TestCoverage(
  {"start":81,"end":253,"count":10},
  {"start":163,"end":253,"count":0},
  {"start":460,"end":553,"count":0},
- {"start":761,"end":951,"count":0}]
+ {"start":761,"end":950,"count":0}]
 );
 
 TestCoverage(
@@ -239,7 +218,7 @@ TestCoverage(
 [{"start":0,"end":299,"count":1},
  {"start":1,"end":201,"count":6},  // TODO(jgruber): Invocation count is off.
  {"start":83,"end":153,"count":4},
- {"start":153,"end":201,"count":1}]
+ {"start":153,"end":200,"count":1}]
 );
 
 TestCoverage(
@@ -301,7 +280,7 @@ TestCoverage(
  {"start":117,"end":303,"count":10},
  {"start":213,"end":303,"count":0},
  {"start":510,"end":603,"count":0},
- {"start":811,"end":1001,"count":0}]
+ {"start":811,"end":1000,"count":0}]
 );
 
 TestCoverage(
@@ -334,7 +313,7 @@ TestCoverage(
  {"start":105,"end":303,"count":10},
  {"start":213,"end":303,"count":0},
  {"start":510,"end":603,"count":0},
- {"start":811,"end":1001,"count":0}]
+ {"start":811,"end":1000,"count":0}]
 );
 
 TestCoverage(
@@ -346,9 +325,9 @@ TestCoverage(
 `,
 [{"start":0,"end":149,"count":1},
  {"start":1,"end":37,"count":1},
- {"start":28,"end":37,"count":0},
+ {"start":28,"end":36,"count":0},
  {"start":51,"end":122,"count":1},
- {"start":81,"end":122,"count":0}]
+ {"start":81,"end":121,"count":0}]
 );
 
 TestCoverage(
@@ -374,12 +353,33 @@ TestCoverage(
 `,
 [{"start":0,"end":849,"count":1},
  {"start":1,"end":801,"count":1},
- {"start":77,"end":87,"count":0},
- {"start":219,"end":232,"count":0},
- {"start":264,"end":274,"count":0},
- {"start":369,"end":380,"count":0},
- {"start":403,"end":414,"count":0},  // TODO(jgruber): Include `catch` in range.
- {"start":513,"end":564,"count":0}]
+ {"start":67,"end":87,"count":0},
+ {"start":219,"end":222,"count":0},
+ {"start":254,"end":274,"count":0},
+ {"start":369,"end":372,"count":0},
+ {"start":390,"end":404,"count":0},
+ {"start":513,"end":554,"count":0}]
+);
+
+TestCoverage("try/catch/finally statements with early return",
+`
+!function() {                             // 0000
+  try { throw 42; } catch (e) { return; } // 0050
+  nop();                                  // 0100
+}();                                      // 0150
+!function() {                             // 0200
+  try { throw 42; } catch (e) {}          // 0250
+  finally { return; }                     // 0300
+  nop();                                  // 0350
+}();                                      // 0400
+`,
+[{"start":0,"end":449,"count":1},
+ {"start":1,"end":151,"count":1},
+ {"start":67,"end":70,"count":0},
+ {"start":89,"end":150,"count":0},
+ {"start":201,"end":401,"count":1},
+ {"start":267,"end":270,"count":0},
+ {"start":319,"end":400,"count":0}]
 );
 
 TestCoverage(
@@ -410,17 +410,16 @@ TestCoverage(
 `,
 [{"start":0,"end":1099,"count":1},
  {"start":1,"end":151,"count":1},
- {"start":67,"end":80,"count":0},
- {"start":89,"end":151,"count":0},
+ {"start":67,"end":70,"count":0},
+ {"start":89,"end":150,"count":0},
  {"start":201,"end":351,"count":1},
- {"start":284,"end":351,"count":0},
+ {"start":284,"end":350,"count":0},
  {"start":401,"end":701,"count":1},
- {"start":569,"end":701,"count":0},
+ {"start":569,"end":700,"count":0},
  {"start":561,"end":568,"count":0},  // TODO(jgruber): Sorting.
  {"start":751,"end":1051,"count":1},
- {"start":817,"end":830,"count":0},
- {"start":861,"end":1051,"count":0}]
-
+ {"start":817,"end":820,"count":0},
+ {"start":861,"end":1050,"count":0}]
 );
 
 TestCoverage(
@@ -527,15 +526,328 @@ var FALSE = false;                        // 0050
 `,
 [{"start":0,"end":849,"count":1},
  {"start":101,"end":801,"count":1},
- {"start":167,"end":172,"count":0},
- {"start":217,"end":222,"count":0},
- {"start":260,"end":265,"count":0},
- {"start":310,"end":372,"count":0},
- {"start":467,"end":472,"count":0},
- {"start":559,"end":564,"count":0},
- {"start":617,"end":680,"count":0},
- {"start":710,"end":715,"count":0},
- {"start":775,"end":780,"count":0}]
+ {"start":165,"end":172,"count":0},
+ {"start":215,"end":222,"count":0},
+ {"start":258,"end":265,"count":0},
+ {"start":308,"end":372,"count":0},
+ {"start":465,"end":472,"count":0},
+ {"start":557,"end":564,"count":0},
+ {"start":615,"end":680,"count":0},
+ {"start":708,"end":715,"count":0},
+ {"start":773,"end":780,"count":0}]
+);
+
+TestCoverage(
+"yield expressions",
+`
+const it = function*() {                  // 0000
+  yield nop();                            // 0050
+  yield nop() ? nop() : nop()             // 0100
+  return nop();                           // 0150
+}();                                      // 0200
+it.next(); it.next();                     // 0250
+`,
+[{"start":0,"end":299,"count":1},
+ {"start":11,"end":201,"count":3},
+ {"start":64,"end":114,"count":1},
+ {"start":114,"end":121,"count":0},
+ {"start":122,"end":129,"count":1},
+ {"start":129,"end":200,"count":0}]
+);
+
+TestCoverage(
+"yield expressions (.return and .throw)",
+`
+const it0 = function*() {                 // 0000
+  yield 1; yield 2; yield 3;              // 0050
+}();                                      // 0100
+it0.next(); it0.return();                 // 0150
+try {                                     // 0200
+  const it1 = function*() {               // 0250
+    yield 1; yield 2; yield 3;            // 0300
+  }();                                    // 0350
+  it1.next(); it1.throw();                // 0400
+} catch (e) {}                            // 0450
+`,
+[{"start":0,"end":499,"count":1},
+ {"start":12,"end":101,"count":3},
+ {"start":60,"end":100,"count":0},
+ {"start":264,"end":353,"count":3},
+ {"start":312,"end":352,"count":0}]
+);
+
+TestCoverage("yield expressions (.return and try/catch/finally)",
+`
+const it = function*() {                  // 0000
+  try {                                   // 0050
+    yield 1; yield 2; yield 3;            // 0100
+  } catch (e) {                           // 0150
+    nop();                                // 0200
+  } finally { nop(); }                    // 0250
+  yield 4;                                // 0300
+}();                                      // 0350
+it.next(); it.return();                   // 0450
+`,
+[{"start":0,"end":449,"count":1},
+ {"start":11,"end":351,"count":3},
+ {"start":112,"end":254,"count":0},
+ {"start":254,"end":272,"count":1},
+ {"start":272,"end":350,"count":0}]
+);
+
+TestCoverage("yield expressions (.throw and try/catch/finally)",
+`
+const it = function*() {                  // 0000
+  try {                                   // 0050
+    yield 1; yield 2; yield 3;            // 0100
+  } catch (e) {                           // 0150
+    nop();                                // 0200
+  } finally { nop(); }                    // 0250
+  yield 4;                                // 0300
+}();                                      // 0350
+it.next(); it.throw(42);                  // 0550
+`,
+[{"start":0,"end":449,"count":1},
+ {"start":11,"end":351,"count":3},
+ {"start":112,"end":154,"count":0},
+ {"start":154,"end":310,"count":1},
+ {"start":310,"end":350,"count":0}]
+);
+
+TestCoverage(
+"yield* expressions",
+`
+const it = function*() {                  // 0000
+  yield* gen();                           // 0050
+  yield* nop() ? gen() : gen()            // 0100
+  return gen();                           // 0150
+}();                                      // 0200
+it.next(); it.next(); it.next();          // 0250
+it.next(); it.next(); it.next();          // 0300
+`,
+[{"start":0,"end":349,"count":1},
+ {"start":11,"end":201,"count":7},
+ {"start":65,"end":115,"count":1},
+ {"start":115,"end":122,"count":0},
+ {"start":123,"end":130,"count":1},
+ {"start":130,"end":200,"count":0}]
+);
+
+TestCoverage(
+"yield* expressions (.return and .throw)",
+`
+const it0 = function*() {                 // 0000
+  yield* gen(); yield* gen(); yield 3;    // 0050
+}();                                      // 0100
+it0.next(); it0.return();                 // 0150
+try {                                     // 0200
+  const it1 = function*() {               // 0250
+    yield* gen(); yield* gen(); yield 3;  // 0300
+  }();                                    // 0350
+  it1.next(); it1.throw();                // 0400
+} catch (e) {}                            // 0450
+`,
+[{"start":0,"end":499,"count":1},
+ {"start":12,"end":101,"count":3},
+ {"start":65,"end":100,"count":0},
+ {"start":264,"end":353,"count":3},
+ {"start":317,"end":352,"count":0}]
+);
+
+TestCoverage(
+"await expressions",
+`
+async function f() {                      // 0000
+  await 42;                               // 0050
+  await 42;                               // 0100
+};                                        // 0150
+f();                                      // 0200
+%RunMicrotasks();                         // 0250
+`,
+[{"start":0,"end":299,"count":1},
+ {"start":0,"end":151,"count":3},
+ {"start":61,"end":150,"count":1}]
+);
+
+TestCoverage(
+"LogicalOrExpression assignment",
+`
+const a = true || 99                      // 0000
+function b () {                           // 0050
+  const b = a || 2                        // 0100
+}                                         // 0150
+b()                                       // 0200
+b()                                       // 0250
+`,
+[{"start":0,"end":299,"count":1},
+ {"start":15,"end":20,"count":0},
+ {"start":50,"end":151,"count":2},
+ {"start":114,"end":118,"count":0}]);
+
+TestCoverage(
+"LogicalOrExpression IsTest()",
+`
+true || false                             // 0000
+const a = 99                              // 0050
+a || 50                                   // 0100
+const b = false                           // 0150
+if (b || true) {}                         // 0200
+`,
+[{"start":0,"end":249,"count":1},
+ {"start":5,"end":13,"count":0},
+ {"start":102,"end":107,"count":0}]);
+
+TestCoverage(
+"LogicalAndExpression assignment",
+`
+const a = false && 99                     // 0000
+function b () {                           // 0050
+  const b = a && 2                        // 0100
+}                                         // 0150
+b()                                       // 0200
+b()                                       // 0250
+const c = true && 50                      // 0300
+`,
+[{"start":0,"end":349,"count":1},
+ {"start":16,"end":21,"count":0},
+ {"start":50,"end":151,"count":2},
+ {"start":114,"end":118,"count":0}]);
+
+TestCoverage(
+"LogicalAndExpression IsTest()",
+`
+false && true                             // 0000
+const a = 0                               // 0050
+a && 50                                   // 0100
+const b = true                            // 0150
+if (b && true) {}                         // 0200
+true && true                              // 0250
+`,
+[{"start":0,"end":299,"count":1},
+ {"start":6,"end":13,"count":0},
+ {"start":102,"end":107,"count":0}]);
+
+TestCoverage(
+"NaryLogicalOr assignment",
+`
+const a = true                            // 0000
+const b = false                           // 0050
+const c = false || false || 99            // 0100
+const d = false || true || 99             // 0150
+const e = true || true || 99              // 0200
+const f = b || b || 99                    // 0250
+const g = b || a || 99                    // 0300
+const h = a || a || 99                    // 0350
+const i = a || (b || c) || d              // 0400
+`,
+[{"start":0,"end":449,"count":1},
+ {"start":174,"end":179,"count":0},
+ {"start":215,"end":222,"count":0},
+ {"start":223,"end":228,"count":0},
+ {"start":317,"end":322,"count":0},
+ {"start":362,"end":366,"count":0},
+ {"start":367,"end":372,"count":0},
+ {"start":412,"end":423,"count":0},
+ {"start":424,"end":428,"count":0}]);
+
+TestCoverage(
+"NaryLogicalOr IsTest()",
+`
+const a = true                            // 0000
+const b = false                           // 0050
+false || false || 99                      // 0100
+false || true || 99                       // 0150
+true || true || 99                        // 0200
+b || b || 99                              // 0250
+b || a || 99                              // 0300
+a || a || 99                              // 0350
+`,
+[{"start":0,"end":399,"count":1},
+ {"start":164,"end":169,"count":0},
+ {"start":205,"end":212,"count":0},
+ {"start":213,"end":218,"count":0},
+ {"start":307,"end":312,"count":0},
+ {"start":352,"end":356,"count":0},
+ {"start":357,"end":362,"count":0}]);
+
+TestCoverage(
+"NaryLogicalAnd assignment",
+`
+const a = true                            // 0000
+const b = false                           // 0050
+const c = false && false && 99            // 0100
+const d = false && true && 99             // 0150
+const e = true && true && 99              // 0200
+const f = true && false || true           // 0250
+const g = true || false && true           // 0300
+`,
+[{"start":0,"end":349,"count":1},
+ {"start":116,"end":124,"count":0},
+ {"start":125,"end":130,"count":0},
+ {"start":166,"end":173,"count":0},
+ {"start":174,"end":179,"count":0},
+ {"start":315,"end":331,"count":0}
+]);
+
+TestCoverage(
+"NaryLogicalAnd IsTest()",
+`
+const a = true                            // 0000
+const b = false                           // 0050
+false && false && 99                      // 0100
+false && true && 99                       // 0150
+true && true && 99                        // 0200
+true && false || true                     // 0250
+true || false && true                     // 0300
+false || false || 99 || 55                // 0350
+`,
+[{"start":0,"end":399,"count":1},
+ {"start":106,"end":114,"count":0},
+ {"start":115,"end":120,"count":0},
+ {"start":156,"end":163,"count":0},
+ {"start":164,"end":169,"count":0},
+ {"start":305,"end":321,"count":0},
+ {"start":371,"end":376,"count":0}]);
+
+// see regression: https://bugs.chromium.org/p/chromium/issues/detail?id=785778
+TestCoverage(
+"logical expressions + conditional expressions",
+`
+const a = true                            // 0000
+const b = 99                              // 0050
+const c = false                           // 0100
+const d = ''                              // 0150
+const e = a && (b ? 'left' : 'right')     // 0200
+const f = a || (b ? 'left' : 'right')     // 0250
+const g = c || d ? 'left' : 'right'       // 0300
+const h = a && b && (b ? 'left' : 'right')// 0350
+const i = d || c || (c ? 'left' : 'right')// 0400
+`,
+[{"start":0,"end":449,"count":1},
+ {"start":227,"end":236,"count":0},
+ {"start":262,"end":287,"count":0},
+ {"start":317,"end":325,"count":0},
+ {"start":382,"end":391,"count":0},
+ {"start":423,"end":431,"count":0}
+]);
+
+TestCoverage(
+"https://crbug.com/827530",
+`
+Util = {};                                // 0000
+Util.escape = function UtilEscape(str) {  // 0050
+  if (!str) {                             // 0100
+    return 'if';                          // 0150
+  } else {                                // 0200
+    return 'else';                        // 0250
+  }                                       // 0300
+};                                        // 0350
+Util.escape("foo.bar");                   // 0400
+`,
+[{"start":0,"end":449,"count":1},
+ {"start":64,"end":351,"count":1},
+ {"start":112,"end":203,"count":0},
+ {"start":303,"end":350,"count":0}]
 );
 
 %DebugToggleBlockCoverage(false);
